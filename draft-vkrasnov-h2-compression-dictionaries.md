@@ -5,8 +5,8 @@ date: 2016-10
 category: info
 
 ipr:
-area: Security
-workgroup: Network
+area: General
+workgroup:
 keyword: Internet-Draft
 
 stand_alone: yes
@@ -25,6 +25,20 @@ normative:
 informative:
   RFC1951:
   RFC7932:
+  BREACH:
+    title: "BREACH: SSL, Gone in 30 Seconds"
+    author:
+      -
+        ins: A. Prado
+        name: Angelo Prado
+      -
+        ins: N. Harris
+        name: Neal Harris
+      -
+        ins: Y. Gluck
+        name: Yoel Gluck
+    date: 2013
+    target: http://breachattack.com/
 
 
 
@@ -35,9 +49,9 @@ that would enable the use of previously transferred data as compression
 dictionaries, significantly improving overall compression ratio for a given
 connection.
 
-In addition this document proposes to define a set of industry standard, static,
+In addition, this document proposes to define a set of industry standard, static,
 dictionaries to be used with any Lempel-Ziv based compression for the common
-textual MIME types prelevant on the web.
+textual MIME types prevalent on the web.
 
 
 --- middle
@@ -50,7 +64,7 @@ encouraged, resulting in fewer, larger assets per website.
 
 The HTTP/2 protocol also allows for transmitted data to be compressed with a
 lossless compression format. The format used is specified in the
-"Content-Encoding" (see {{RFC2616}}, section 14.11) header field. For example
+"Content-Encoding" (see {{RFC2616}}, section 14.11) header field. For example,
 "Content-Encoding: br" means the data was compressed using the Brotli format.
 
 The nature of the compression algorithms, such as DEFLATE {{RFC1951}} and
@@ -66,7 +80,7 @@ compression ratio). This technique is known to improve compression ratio
 significantly, while not requiring significant additional processing time, and
 is supported by most LZ based compression formats.
 
-This document introduces a mechanism for using previously tranmitted data over
+This document introduces a mechanism for using previously transmitted data over
 HTTP/2 as a dictionary to be used with an underlying compression algorithm.
 
 ## Conventions and Terminology
@@ -85,7 +99,7 @@ SETTINGS_ENABLE_DICTIONARIES(0xTBA):
 : This setting can be used to enable the use of Compression Dictionaries for a
 given connection. The value indicates how many dictionaries the sender is
 willing to maintain. The default value is 0, the maximal value is 256. Value
-higher than 256 may indicate that the sender is willing to intialize the
+higher than 256 may indicate that the sender is willing to initialize the
 dictionaries with the default preset values. In that case the actual value for
 this setting is computed as "value - 256".
 
@@ -108,7 +122,7 @@ The SET_DICTIONARY frame (type=0xTBA).
 
 The SET_DICTIONARY frame can be sent from the server to the client, on any client
 initiated stream in the open or half-closed (remote) states. The SET_DICTIONARY
-frame MUST preceed any DATA frames on that stream. The SET_DICTIONARY frame SHOULD
+frame MUST preced any DATA frames on that stream. The SET_DICTIONARY frame SHOULD
 be followed by sufficient DATA frames to fill Size octets after decompression,
 even if an RST frame was received for that stream. If not enough DATA was sent,
 the Dictionary for the given ID is considered uninitialized.
@@ -183,8 +197,8 @@ Doing otherwise will result in an illegal state of the dictionaries. This is
 similar to the way HEADER frames are processed in order to maintain legal HPACK
 state on the server and the client.
 
-All the dicionaries are initially uninitialized. If the use of static dictionaries
-is agreed upon by both parties, then the dictionaries are initilized as described
+All the dictionaries are initially uninitialized. If the use of static dictionaries
+is agreed upon by both parties, then the dictionaries are initialized as described
 in {{static-dictionaries}}.
 
 When SET_DICTIONARY is used, both the server and the client will either use the
@@ -199,9 +213,9 @@ octets are used.
 The server MAY send a SET_DICTIONARY frame on any client initiated stream in the
 open or half-closed (remote) states, prior to sending any DATA on that stream.
 
-After the server sent a SET_DICTIONARY stream with a given ID, it MUST not use
+After the server sends a SET_DICTIONARY stream with a given ID, it MUST not use
 the dictionary for compression, until it sent sufficient data for the dictionary
-to become usable by the client. Sufficient data is computed a the size of the
+to become usable by the client. Sufficient data is computed as the size of the
 data after decompression.
 
 After sufficient data was sent, the server MAY use the associated dictionary on
@@ -222,16 +236,17 @@ considered as stream error of type COMPRESSION_ERROR.
 # Security Considerations
 
 As with any compression scheme, using cross-stream compression is potentially
-more sensitive to BREACH type of attacks.
+more sensitive to {{BREACH}} type of attacks.
 
-Therefore this extension SHALL be disabled by default by all server implementations.
+Therefore, this extension SHALL be disabled by default by all server implementations.
 
 If a server acts as an intermediary, then it MUST NOT enable cross-stream
 compression, unless the origin also enables cross-stream compression. If the
-origin does not use the HTTP/2 protocol, is MUST notify the intermediary explicitly
-by either sending a preagreed upon header, or out-of-band.
+origin does not use the HTTP/2 protocol, the intermediary server MUST NOT use
+cross-stream compression, unless notified by the origin explicitly by either a
+receipt of a pre-agreed upon HTTP header, or out-of-band.
 
-In addition a server SHOULD avoid the use cross-stream compression on cross-site
+In addition, a server SHOULD avoid the use cross-stream compression on cross-site
 requests.
 
 The serve MAY always use the predefined static dictionaries.
