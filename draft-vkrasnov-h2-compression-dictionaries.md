@@ -103,10 +103,73 @@ document are to be interpreted as described in RFC 2119 {{RFC2119}}.
 
 ## Security Considerations
 
-The use of compression over an encrypted connection is known to leak
-potentialy sensitive information. We will collaborate with industry experts to
-identify any additional attack vectors introduced by this draft, and include
-a set of best practices to both servers and clients that would implement it.
+The use of compression over an encrypted connection could be used by malicious
+actors to potentially leak sensitive information. We will collaborate with
+industry experts to identify any additional attack vectors introduced by this
+draft, and include a set of best practices to both servers and clients that
+would implement it.
+
+### Attack scenarios and mitigations
+A single HTTP/2 connection is likely to be shared among multiple origins (over
+which it is authoritative) and among different navigation contexts to the same
+origin. When such sharing happens, and if compression contexts are shared
+between those instances, an attacker can use a BREACH-style attack in order to
+exfiltrate secrets from the context. Such secrets may include:
+
+* Cookies set using Javascript (and in-particular `httponly` cookies set from
+anonymous functions in external JS, which is not accessible to scripts
+otherwise)
+* CSRF tokens
+* CSP nonces
+* Application level secrets (e.g. financial information, stored credit cards
+numbers, codes, etc.)
+
+The mechanism for such data theft can happen if the attacker can:
+* Download multiple similar payloads to the target page modulo the actual
+secret, while trying out multiple permutations of the secret.
+* Observe the on-the-wire transfer size using Resource Timing's
+`transferSize` property.
+
+The rest of this section will describe different scenarios where those
+conditions are met as well as potential mitigations for them.
+
+#### Cross-origin secret leak
+An HTTP/2 session can be used to deliver resources from multiple origins over
+which the session has proved to be authoritative. As a result, sharing
+compression contexts between such origins can be theoretically used to leak
+secrets from one of these origins to the next.
+
+##### Mitigation
+Limiting compression contexts to be used within the confines of a single origin.
+
+#### Same-origin secret leak
+Malicious pages on the origin as well as an XSS attacker can normally use
+`fetch()` or `XMLHttpRequest()` in order to inspect in-content secrets.
+This could be limited with CSP by only permitting the download of specific
+files, using nonces or using `connect-src 'none'` in order to limit arbitrary
+scripts from downloading files that contain secrets.
+However, using shared-dictionaries between secret resources and malicious ones
+can enable an attacker to guess said secrets and exfiltrate them (e.g. using
+other deficiencies in the defined CSP, if there are any).
+
+Furthermore, said malicious page or XSS attack can also use as a dictionary
+resources fetched from the same origin in a different browsing context,
+enabling it to also inspect resources which cannot be fetched at all on its
+base page.
+
+##### Mitigation
+There's no obvious mitigation for this kind of attack, but a few options are:
+
+* Limiting compression contexts to be used only within a single navigation
+context can limit the opportunity for the separate navigation context to
+inspect secrets from resources it is not allowed to fetch. At the same time
+this can be complex to implement, as the network layer is not aware of the
+navigation context and is supposed for example to dedupe outgoing requests from
+different compression contexts.
+* `transferSize` padding/bucketing in such cases (e.g. pages with above
+mentioned CSP limitations) may be enough to render this attack not-practical.
+* Limit dictionary sharing (or `transferSize` accuracy for resources that use
+shared dictionaries) only to non-credentialed resource fetches.
 
 ## Content Coding
 
