@@ -20,7 +20,7 @@ author:
 
  -  ins: Y. Weiss
     name: Yoav Weiss
-    organization: Akamai, Inc.
+    organization: Akamai Technologies, Inc.
     email: yoav@yoav.ws
 
 
@@ -193,7 +193,8 @@ Context:
 : an 8-bit context ID that indicates the compression context for the stream.
 If the frame is ommited, then the context value is assumed to be 0.
 The allowed context values are 0 through 255.
-A special context ID of 255 indicates the stream SHALL NOT be cross-compressed.
+A special context ID of 255 indicates the stream can only be compressed using
+the static dictionaries.
 
 ### The SET_DICTIONARY Frame
 
@@ -213,7 +214,7 @@ A Dictionary-Entry field is encoded as follows:
 +---+---------------------------+
 | P |        Size (7+)          |
 +---+---------------------------+
-| E?|      Truncate? (7+)       |
+| E?| D?|  Truncate? (6+)       |
 +---+---------------------------+
 |           Offset? (8+)        |
 +-------------------------------+
@@ -221,10 +222,10 @@ A Dictionary-Entry field is encoded as follows:
 ~~~~
 
 The SET_DICTIONARY frame can be sent from the server to the client, on any
-client initiated stream in the open or half-closed (remote) states. The
-SET_DICTIONARY frame MUST precede any DATA frames on that stream. The
-SET_DICTIONARY frame SHOULD be followed by sufficient DATA frames to build the
-dictionaries.
+client initiated stream in the open or half-closed (remote) states, or on any
+server initiated stream in the reserved (local) state. The SET_DICTIONARY frame
+MUST precede any DATA frames on that stream. The SET_DICTIONARY frame SHOULD be
+followed by sufficient DATA frames to build the dictionaries.
 If a RST frame was received for the stream before sufficient DATA was sent, the
 dictionaries are reset.
 
@@ -236,17 +237,19 @@ the SETTINGS_COMPRESSION setting.
 
 Size:
 : Indicates how many octets of the stream will be used for the dictionary.
-Size is represented as an integer with 7-bit prefix (see {{RFC1951}},
+Size is represented as an integer with 7-bit prefix (see {{RFC7541}},
 Section 5.1). If P is set, the actual number of octets to use is 2 to the power
 of Size. If the computed value is greater than the length of the decompressed
 DATA, use all the available DATA.
 
 Truncate:
-: An optional field, represented as an integer with 7-bit prefix. Present when
+: An optional field, represented as an integer with 6-bit prefix. Present when
 the APPEND flag is set. Truncate indicates the number of octets to keep of the
 existing dictionary, before appending the new data to it. If E is set, then
 Truncate is ignored, and new data is appended at the end. If Truncate is zero,
-then the dictionary is replaced, as if APPEND was unset.
+then the dictionary is replaced, as if APPEND was unset. If the optional field
+D is set, then the first Truncate octets of the previous dictionary are used,
+otherwise the last Truncate octets are used.
 
 Offset:
 : An optional field, represented as an integer with 8-bit prefix. Present when
@@ -259,7 +262,7 @@ in the frame. The SET_DICTIONARY frame defines the following flags:
 APPEND (0x1):
 : Indicates that the data is to be appended to the existing dictionary with the
 given ID, as opposed to replacing it with the new data. Also indicates that
-fields E and Truncate are present.
+fields E, D and Truncate are present.
 
 OFFSET (0x2):
 : Indicates the presence of the Offset field.
@@ -339,57 +342,64 @@ Initially all the dictionaries are unitialized:
 
 Client side USE_DICTIONARY frame behaviour pseudo code:
 
-    d = dictionaries[frame.Dictionary-ID]
+    dictionary = dictionaries[frame.Dictionary-ID]
 
-    if (d.ctx != 0 && d.ctx != stream.ctx)
+    if (dictionary.ctx != 0 && dictionary.ctx != stream.ctx)
         return PROTOCOL_ERROR
 
     stream.decompressed_data = decompress(stream.dict, stream.data)
 
 Client side SET_DICTIONARY frame behaviour pseudo code:
 
-    foreach e = frame.Dictionary-Entry {
-        d = dictionaries[e.DICT_ID]
+    foreach entry = frame.Dictionary-Entry {
+        dictionary = dictionaries[e.DICT_ID]
 
-        if (e.size == 0) {
-            d.size = 0
-            d.ctx = 0
+        if (entry.size == 0) {
+            dictionary.size = 0
+            dictionary.ctx = 0
+            dictionary.dict = {}
             continue
         }
 
-        if (d.ctx != 0 && d.ctx != stream.ctx) {
+        if (dictionary.ctx != 0 && dictionary.ctx != stream.ctx) {
             return PROTOCOL_ERROR
         }
 
-        d.ctx = stream.ctx
+        dictionary.ctx = stream.ctx
 
-        if (frame.P == 1) {
-            size = 1 << frame.Size
+        if (entry.P == 1) {
+            size = 1 << entry.Size
         } else {
-            size = frame.Size
+            size = entry.Size
         }
 
         if (frame.APPEND) {
-            if (frame.E == 1) {
-                truncate = d.size
+            if (entry.E == 1) {
+                truncate = dictionary.size
             } else {
-                truncate = frame.Truncate
+                truncate = entry.Truncate
             }
         } else {
             truncate = 0
         }
 
         if (frame.OFFSET) {
-            offset = frame.Offset
+            offset = entry.Offset
         } else {
             offset = 0
         }
 
         new_dict_data = stream.decompressed_data[offset:offset + size]
-	old_dict_data = d.dict[0:truncate]
+        if (e.D == 1) {
+            old_dict_data = head(dictionary.dict, truncate)
+        } else {
+            old_dict_data = tail(dictionary.dict, truncate)
+        }
 
-        d.dict = tail(append(old_dict_data, new_dict_data), 1 << settings.DSize)
-        d.size = len(d.dict)
+        dict_data = append(old_dict_data, new_dict_data)
+
+        dictionary.dict = tail(dict_data, 1 << settings.DSize)
+        dictionary.size = len(d.dictionary)
     }
 
 The server behaviour mirrors the client behaviour, but it is up to the server
