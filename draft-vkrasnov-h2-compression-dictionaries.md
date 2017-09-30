@@ -356,7 +356,7 @@ Client side USE_DICTIONARY frame behaviour pseudo code:
 Client side SET_DICTIONARY frame behaviour pseudo code:
 
     foreach entry = frame.Dictionary-Entry {
-        dictionary = dictionaries[e.DICT_ID]
+        dictionary = dictionaries[entry.DICT_ID]
 
         if (entry.size == 0) {
             dictionary.size = 0
@@ -394,7 +394,7 @@ Client side SET_DICTIONARY frame behaviour pseudo code:
         }
 
         new_dict_data = stream.decompressed_data[offset:offset + size]
-        if (e.D == 1) {
+        if (entry.D == 1) {
             old_dict_data = head(dictionary.dict, truncate)
         } else {
             old_dict_data = tail(dictionary.dict, truncate)
@@ -403,7 +403,7 @@ Client side SET_DICTIONARY frame behaviour pseudo code:
         dict_data = append(old_dict_data, new_dict_data)
 
         dictionary.dict = tail(dict_data, 1 << settings.DSize)
-        dictionary.size = len(d.dictionary)
+        dictionary.size = len(dictionary.dict)
     }
 
 The server behaviour mirrors the client behaviour, but it is up to the server
