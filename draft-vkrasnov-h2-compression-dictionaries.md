@@ -137,6 +137,15 @@ Pushed streams may be cross-stream compressed or used as dictionaries, same as
 a regular stream. In some scenarios it may benefit the server to push a dummy
 resource to prime a dictionary.
 
+## HTTP/QUIC
+
+Due to the nature of this draft, it is expected that a strict order is
+maintained between the definition and consumption of dictionaries. The nature
+of QUIC is such that frames and streams might not delivered in the order they
+are sent, therefore, a head-of-line blocking may occur when implementing
+compression dictionaries in HTTP/QUIC. This is similar to the tradeoff present
+in the HPACK/QUIC mapping.
+
 # HTTP/2 Extension
 
 ## Extension Settings
