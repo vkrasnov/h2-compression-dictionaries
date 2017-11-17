@@ -445,7 +445,7 @@ conditions are met as well as potential mitigations for them.
 ### Cross-origin secret leak
 An HTTP/2 session can be used to deliver resources from multiple origins over
 which the session has proved to be authoritative, through connection reuse (see
-{{RFC 7540}} section 9.1.1 for more details).
+{{RFC7540}} section 9.1.1 for more details).
 As a result, sharing compression contexts between such origins can be
 theoretically used to leak secrets from one of these origins to the next.
 
